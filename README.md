@@ -1,1 +1,1 @@
-# -elasticsearch-scaler-source-code
+# elasticsearch-scaler-source-code
