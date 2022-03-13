@@ -1,0 +1,104 @@
+
+kind: Service
+apiVersion: v1
+metadata:
+  name: elasticsearch-svc
+spec:
+  type: ClusterIP
+  ports:
+  - name: http
+    port: 9200
+    targetPort: 9200
+    protocol: TCP
+  selector:
+    name: elasticsearch
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: elasticsearch
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      name: elasticsearch
+  template:
+    metadata:
+      labels:
+        name: elasticsearch
+    spec:
+      containers:
+      - name: elasticsearch
+        image: docker.elastic.co/elasticsearch/elasticsearch:7.15.1
+        imagePullPolicy: IfNotPresent
+        env:
+          - name: POD_IP
+            valueFrom:
+              fieldRef:
+                apiVersion: v1
+                fieldPath: status.podIP
+          - name: POD_NAME
+            valueFrom:
+              fieldRef:
+                apiVersion: v1
+                fieldPath: metadata.name
+          - name: NODE_NAME
+            valueFrom:
+              fieldRef:
+                apiVersion: v1
+                fieldPath: spec.nodeName
+          - name: NAMESPACE
+            valueFrom:
+              fieldRef:
+                apiVersion: v1
+                fieldPath: metadata.namespace
+          - name: ES_JAVA_OPTS
+            value: -Xms256m -Xmx256m
+          - name: cluster.name
+            value: elasticsearch-keda
+          - name: cluster.initial_master_nodes
+            valueFrom:
+              fieldRef:
+                apiVersion: v1
+                fieldPath: status.podIP
+          - name: node.data
+            value: "true"
+          - name: node.ml
+            value: "false"
+          - name: node.ingest
+            value: "false"
+          - name: node.master
+            value: "true"
+          - name: node.remote_cluster_client
+            value: "false"
+          - name: node.transform
+            value: "false"
+          - name: ELASTIC_PASSWORD
+            value: "passw0rd!"
+          - name: xpack.security.enabled
+            value: "true"
+          - name: node.store.allow_mmap
+            value: "false"
+        ports:
+        - containerPort: 9200
+          name: http
+          protocol: TCP
+        - containerPort: 9300
+          name: transport
+          protocol: TCP
+        resources:
+        readinessProbe:
+          exec:
+            command:
+              - /usr/bin/curl
+              - -sS
+              - -u "elastic:{{ELASTIC_PASSWORD}}"
+              - http://localhost:9200
+          failureThreshold: 3
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          successThreshold: 1
+          timeoutSeconds: 5
+
+
+  serviceName: elasticsearch-svc
